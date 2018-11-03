@@ -46,6 +46,97 @@ struct ReprojectError
     const double v_;
 };
 
+//class BAdata
+//{
+//public:
+//    BAdata(const std::string &str)
+//    {
+//        LoadFile(str);
+//    }
+//
+//    ~BAdata()
+//    {
+//        delete[](KFids);
+//        delete[](MPids);
+//        delete[](observations);
+//        delete[](KFs);
+//        delete[](Mps);
+//    }
+//
+//private:
+//    template <typename T>
+//    void FscanfOrDie(FILE *fptr, const char *format, T* value)
+//    {
+//        int numScan = fscanf(fptr, format, value);
+//
+//        if (numScan != 1)
+//        {
+//            std::cerr << "cannot load data file, please check if it exists" << endl;
+//            std::abort();
+//        }
+//    }
+//
+//    void LoadFile(const std::string &str)
+//    {
+//        FILE* fptr = fopen(str.c_str(), "r");
+//        if (!fptr)
+//        {
+//            std::cerr << "cannot load data file at " << str << ", please check if it exists" << endl;
+//            std::abort();
+//        }
+//
+//        // step1: 读入第一行，keyframe, mapPoint以及observation的个数
+//        FscanfOrDie(fptr, "%d", &nKFs);
+//        FscanfOrDie(fptr, "%d", &nMPs);
+//        FscanfOrDie(fptr, "%d", &nObservations);
+//
+//        // step2: 读取每个observation中，KF的id以及mapPoint的id以及在KF上观测到的这个mapPoint的(u,v)坐标
+//        KFids = new int[nObservations];
+//        MPids = new int[nObservations];
+//        observations = new double[nObservations*2];
+//        for (int i = 0; i < nObservations; ++i)
+//        {
+//            FscanfOrDie(fptr, "%d", KFids+i);
+//            FscanfOrDie(fptr, "%d", MPids+i);
+//            FscanfOrDie(fptr, "%lf", observations+2*i);
+//            FscanfOrDie(fptr, "%lf", observations+2*i+1);
+//        }
+//
+//        // step3: 读取每个keyframe的pose的初始值
+//        KFs = new double*[nKFs];
+//        for (int i = 0; i < nKFs; ++i)
+//        {
+//            KFs[i] = new double[9];
+//            for (int j = 0; j < 9; ++j)
+//            {
+//                FscanfOrDie(fptr, "%lf", KFs[i]+j);
+//            }
+//        }
+//
+//        // step4: 读取每个mapPoint的世界坐标的初始值
+//        Mps = new double*[nMPs];
+//        for (int i = 0; i < nMPs; ++i)
+//        {
+//            Mps[i] = new double[3];
+//            for (int j = 0; j < 3; ++j)
+//            {
+//                FscanfOrDie(fptr, "lf%", Mps[i]+j);
+//            }
+//        }
+//    }
+//
+////private:
+//public:
+//    int nKFs;
+//    int nMPs;
+//    int nObservations;
+//    int* KFids;
+//    int* MPids;
+//    double* observations;
+//    double** KFs;
+//    double** Mps;
+//};
+
 class BAdata
 {
 public:
@@ -56,94 +147,17 @@ public:
 
     ~BAdata()
     {
-        delete[](KFids);
-        delete[](MPids);
-        delete[](observations);
-        delete[](KFs);
-        delete[](Mps);
+        delete[](pKFs);
+        delete[](pMPs);
     }
 
-private:
-    template <typename T>
-    void FscanfOrDie(FILE *fptr, const char *format, T* value)
-    {
-        int numScan = fscanf(fptr, format, value);
-
-        if (numScan != 1)
-        {
-            std::cerr << "cannot load data file, please check if it exists" << endl;
-            std::abort();
-        }
-    }
-
-    void LoadFile(const std::string &str)
-    {
-        FILE* fptr = fopen(str.c_str(), "r");
-        if (!fptr)
-        {
-            std::cerr << "cannot load data file at " << str << ", please check if it exists" << endl;
-            std::abort();
-        }
-
-        // step1: 读入第一行，keyframe, mapPoint以及observation的个数
-        FscanfOrDie(fptr, "%d", &nKFs);
-        FscanfOrDie(fptr, "%d", &nMPs);
-        FscanfOrDie(fptr, "%d", &nObservations);
-
-        // step2: 读取每个observation中，KF的id以及mapPoint的id以及在KF上观测到的这个mapPoint的(u,v)坐标
-        KFids = new int[nObservations];
-        MPids = new int[nObservations];
-        observations = new double[nObservations*2];
-        for (int i = 0; i < nObservations; ++i)
-        {
-            FscanfOrDie(fptr, "%d", KFids+i);
-            FscanfOrDie(fptr, "%d", MPids+i);
-            FscanfOrDie(fptr, "%lf", observations+2*i);
-            FscanfOrDie(fptr, "%lf", observations+2*i+1);
-        }
-
-        // step3: 读取每个keyframe的pose的初始值
-        KFs = new double*[nKFs];
-        for (int i = 0; i < nKFs; ++i)
-        {
-            KFs[i] = new double[9];
-            for (int j = 0; j < 9; ++j)
-            {
-                FscanfOrDie(fptr, "%lf", KFs[i]+j);
-            }
-        }
-
-        // step4: 读取每个mapPoint的世界坐标的初始值
-        Mps = new double*[nMPs];
-        for (int i = 0; i < nMPs; ++i)
-        {
-            Mps[i] = new double[3];
-            for (int j = 0; j < 3; ++j)
-            {
-                FscanfOrDie(fptr, "lf%", Mps[i]+j);
-            }
-        }
-    }
-
-//private:
-public:
     int nKFs;
     int nMPs;
     int nObservations;
-    int* KFids;
-    int* MPids;
-    double* observations;
-    double** KFs;
-    double** Mps;
-};
-
-class BAdata1
-{
-public:
-    BAdata1(const std::string &str)
-    {
-        LoadFile(str);
-    }
+    std::vector<std::pair<int, int> > vKFid_MPid;
+    std::vector<Eigen::Vector2d> vObservations;  // 能直接观测到的量就是mapPoint在图像上的(u,v)坐标
+    double* pKFs;  // nKFs*9的二维数组
+    double* pMPs;  // nMPs*3的二维数组
 
 private:
     void LoadFile(const std::string &str)
@@ -167,39 +181,26 @@ private:
         }
 
         // step3: 读取每个keyframe的pose的初始值
-        vKFs.resize(nKFs);
-        for (int i = 0; i < nKFs; ++i)
+        pKFs = new double[9*nKFs];
+        for (int i = 0; i < 9*nKFs; ++i)
         {
             getline(fin, ptline);
             std::stringstream ss(ptline);
 
-            for (int j = 0; j < 9; ++j)
-            {
-                ss >> vKFs[i][j];
-            }
+            ss >> *(pKFs + i);
         }
 
         // step4: 读取每个mapPoint的世界坐标的初始值
-        vMps.resize(nMPs);
-        for (int i = 0; i < nMPs; ++i)
+        pMPs = new double[3*nMPs];
+        for (int i = 0; i < 3*nMPs; ++i)
         {
             getline(fin, ptline);
             std::stringstream ss(ptline);
 
-            for (int j = 0; j < 3; ++j)
-            {
-                ss >> vMps[i][j];
-            }
+            ss >> *(pMPs + i);
         }
     }
 
-    int nKFs;
-    int nMPs;
-    int nObservations;
-    std::vector<std::pair<int, int> > vKFid_MPid;
-    std::vector<Eigen::Vector2d> vObservations;  // 能直接观测到的量就是mapPoint在图像上的(u,v)坐标
-    std::vector<Eigen::Matrix<double, 1, 9> > vKFs;
-    std::vector<Eigen::Vector3d> vMps;
 };
 
 int main()
@@ -217,10 +218,15 @@ int main()
     for (int i = 0; i < BA.nObservations; ++i)
     {
         ceres::CostFunction* pCostFunction = new ceres::AutoDiffCostFunction<ReprojectError, 2, 9, 3>(
-                new ReprojectError(BA.observations[i*2], BA.observations[i*2+1]));
-        int KFid = BA.KFids[i];
-        int MPid = BA.MPids[i];
-        problem.AddResidualBlock(pCostFunction, nullptr, BA.KFs[KFid], BA.Mps[MPid]);
+                new ReprojectError(BA.vObservations[i][0], BA.vObservations[i][1]));
+        int KFid = BA.vKFid_MPid[i].first;
+        int MPid = BA.vKFid_MPid[i].second;
+        problem.AddResidualBlock(pCostFunction, nullptr, BA.pKFs + 9*KFid, BA.pMPs + 3*MPid);
+//        double u = BA.vObservations[i][0];
+//        double v = BA.vObservations[i][1];
+//        double kf = *(BA.pKFs + 9*KFid);
+//        double mp = *(BA.pMPs + 3*MPid);
+//        cout << u << " " << v << " " << kf << " " << mp << endl;
     }
 
     // Step2: Solve it
