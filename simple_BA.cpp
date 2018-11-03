@@ -1,5 +1,6 @@
 #include <iostream>
 #include <eigen3/Eigen/Eigen>
+#include <sophus/so3.h>
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <glog/logging.h>
@@ -16,9 +17,22 @@ struct ReprojectError
     template <typename T>  // 这个T是double或者Jet
     bool operator()(const T* const KeyFrame, const T* const mapPoint, T* residual) const
     {
+        Eigen::Matrix<T, 3, 1> rotateVector;
+        rotateVector[0] = KeyFrame[0]; rotateVector[1] = KeyFrame[1]; rotateVector[2] = KeyFrame[2];
+        Eigen::AngleAxis<T> rv(rotateVector.norm(), rotateVector/rotateVector.norm());
+        Eigen::Matrix<T, 3, 3> R(rv);
+        Eigen::Matrix<T, 3, 1> t;
+        t[0] = KeyFrame[3]; t[1] = KeyFrame[4]; t[2] = KeyFrame[5];
+        Eigen::Matrix<T, 3, 1> pw;
+        pw[0] = mapPoint[0]; pw[1] = mapPoint[1]; pw[2] = mapPoint[2];
+        Eigen::Matrix<T, 3, 1> pc = R*pw + t;
+        pc /= -pc[2];
+        T r = pc[0]*pc[0] + pc[1]*pc[1];
+        pc *= T(1) + KeyFrame[7]*r + KeyFrame[8]*r*r;
         T p[3];
         // 将这个mapPoint变换到相机坐标系下，先选转再平移，KeyFrame的前3维是旋转向量
         // step1: 旋转R*p，这个函数的意思是按照keyframe所代表的旋转向量将mapPoint进行旋转，结果保存在p中
+//        ceres::AngleAxisToRotationMatrix()
         ceres::AngleAxisRotatePoint(KeyFrame, mapPoint, p);
         // step2: 平移R*p + t，KeyFrame的后3维是平移t，直接相加即可
         p[0] += KeyFrame[3]; p[1] += KeyFrame[4]; p[2] += KeyFrame[5];
@@ -34,6 +48,8 @@ struct ReprojectError
         // 小孔成像投影模型计算在成像平面上的(u,v)
         T predict_u = KeyFrame[6] * Xc;
         T predict_v = KeyFrame[6] * Yc;
+//        T predict_u = KeyFrame[6] * pc[0];
+//        T predict_v = KeyFrame[6] * pc[1];
 
         // 最终计算残差
         residual[0] = u_ - predict_u;
@@ -222,11 +238,6 @@ int main()
         int KFid = BA.vKFid_MPid[i].first;
         int MPid = BA.vKFid_MPid[i].second;
         problem.AddResidualBlock(pCostFunction, nullptr, BA.pKFs + 9*KFid, BA.pMPs + 3*MPid);
-//        double u = BA.vObservations[i][0];
-//        double v = BA.vObservations[i][1];
-//        double kf = *(BA.pKFs + 9*KFid);
-//        double mp = *(BA.pMPs + 3*MPid);
-//        cout << u << " " << v << " " << kf << " " << mp << endl;
     }
 
     // Step2: Solve it
