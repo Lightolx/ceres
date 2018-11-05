@@ -20,6 +20,6 @@ include_directories(${CERES_INCLUDE_DIRS})
 
 add_executable(simpleBA simple_BA.cpp)
 target_link_libraries(simpleBA ${CERES_LIBRARIES})
-
-add_executable(simpleBA1 simple_bundle_adjuster.cc)
-target_link_libraries(simpleBA1 ${CERES_LIBRARIES})
+#
+#add_executable(simpleBA1 simple_bundle_adjuster.cc)
+#target_link_libraries(simpleBA1 ${CERES_LIBRARIES})

@@ -15,45 +15,32 @@ struct ReprojectError
     {}
 
     template <typename T>  // 这个T是double或者Jet
-    bool operator()(const T* const KeyFrame, const T* const mapPoint, T* residual) const
+    bool operator()(const T* const pKeyFrame, const T* const pMapPoint, T* residual) const
     {
-        Eigen::Matrix<T, 3, 1> rotateVector;
-        rotateVector[0] = KeyFrame[0]; rotateVector[1] = KeyFrame[1]; rotateVector[2] = KeyFrame[2];
+        // 注意这里的入参KeyFrame以及mapPoint等都要满足加法与乘法的封闭性，因为ceres的自动求导不可能还去帮你考虑R单位正交的特性，它只能是认为相机的位姿以及点的位置都是加乘法封闭的，所以我们不能给R而要转换成旋转向量给进来
+        // Step0: 数据转换，把所有的数组转换为Eigen::Matrix
+        // 在这里使用Eigen::Map<>方法，从data指针直接构造Eigen::Matrix，模版参数表示 const表示矩阵行列数固定，根据行列数从指针处读取固定数目的值构成Eigen::Matrix
+        Eigen::Map<const Eigen::Matrix<T, 3, 1>> rotateVector(pKeyFrame);
         Eigen::AngleAxis<T> rv(rotateVector.norm(), rotateVector/rotateVector.norm());
         Eigen::Matrix<T, 3, 3> R(rv);
-        Eigen::Matrix<T, 3, 1> t;
-        t[0] = KeyFrame[3]; t[1] = KeyFrame[4]; t[2] = KeyFrame[5];
-        Eigen::Matrix<T, 3, 1> pw;
-        pw[0] = mapPoint[0]; pw[1] = mapPoint[1]; pw[2] = mapPoint[2];
-        Eigen::Matrix<T, 3, 1> pc = R*pw + t;
-        pc /= -pc[2];
-        T r = pc[0]*pc[0] + pc[1]*pc[1];
-        pc *= T(1) + KeyFrame[7]*r + KeyFrame[8]*r*r;
-        T p[3];
-        // 将这个mapPoint变换到相机坐标系下，先选转再平移，KeyFrame的前3维是旋转向量
-        // step1: 旋转R*p，这个函数的意思是按照keyframe所代表的旋转向量将mapPoint进行旋转，结果保存在p中
-//        ceres::AngleAxisToRotationMatrix()
-        ceres::AngleAxisRotatePoint(KeyFrame, mapPoint, p);
-        // step2: 平移R*p + t，KeyFrame的后3维是平移t，直接相加即可
-        p[0] += KeyFrame[3]; p[1] += KeyFrame[4]; p[2] += KeyFrame[5];
+        Eigen::Map<const Eigen::Matrix<T, 3, 1>> t(pKeyFrame+3);
+        Eigen::Map<const Eigen::Matrix<T, 3, 1>> Xw(pMapPoint);
 
-        // 去畸变，keyFrame的第7个参数是焦距fx = fy，并且假设cx = cy = 0，第8,9两个参数是去畸变系数
-        T Xc = -p[0] / p[2];
-        T Yc = -p[1] / p[2];
-        T r2 = Xc*Xc + Yc*Yc;
-        // 去畸变后在归一化平面上的坐标
-        T XcUndist = Xc*(T(1) + KeyFrame[7]*r2 + KeyFrame[8]*r2*r2);
-        T YcUndist = Yc*(T(1) + KeyFrame[7]*r2 + KeyFrame[8]*r2*r2);
+        // Step1: 将这个mapPoint变换到相机坐标系下，先选转再平移，KeyFrame的前3维是旋转向量， 后3维是平移t
+        Eigen::Matrix<T, 3, 1> Xc = R*Xw + t;
+        Xc /= -Xc[2];  // 转换到归一化平面
 
-        // 小孔成像投影模型计算在成像平面上的(u,v)
-        T predict_u = KeyFrame[6] * Xc;
-        T predict_v = KeyFrame[6] * Yc;
-//        T predict_u = KeyFrame[6] * pc[0];
-//        T predict_v = KeyFrame[6] * pc[1];
+        // Step2: 去畸变，keyFrame的第7个参数是焦距fx = fy，并且假设cx = cy = 0，第8,9两个参数是去畸变系数
+        T r2 = Xc[0]*Xc[0] + Xc[1]*Xc[1];
+        Xc *= T(1) + pKeyFrame[7]*r2 + pKeyFrame[8]*r2*r2;
 
-        // 最终计算残差
-        residual[0] = u_ - predict_u;
-        residual[1] = v_ - predict_v;
+        // Step3: 归一化平面转换到成像平面上，小孔成像投影模型计算在成像平面上的(u,v)
+        T predict_u = pKeyFrame[6] * Xc[0];
+        T predict_v = pKeyFrame[6] * Xc[1];
+
+        // 最终计算残差，预测减去观测
+        residual[0] = predict_u - u_;
+        residual[1] = predict_v - v_;
 
         return true;
     }
@@ -61,97 +48,6 @@ struct ReprojectError
     const double u_;
     const double v_;
 };
-
-//class BAdata
-//{
-//public:
-//    BAdata(const std::string &str)
-//    {
-//        LoadFile(str);
-//    }
-//
-//    ~BAdata()
-//    {
-//        delete[](KFids);
-//        delete[](MPids);
-//        delete[](observations);
-//        delete[](KFs);
-//        delete[](Mps);
-//    }
-//
-//private:
-//    template <typename T>
-//    void FscanfOrDie(FILE *fptr, const char *format, T* value)
-//    {
-//        int numScan = fscanf(fptr, format, value);
-//
-//        if (numScan != 1)
-//        {
-//            std::cerr << "cannot load data file, please check if it exists" << endl;
-//            std::abort();
-//        }
-//    }
-//
-//    void LoadFile(const std::string &str)
-//    {
-//        FILE* fptr = fopen(str.c_str(), "r");
-//        if (!fptr)
-//        {
-//            std::cerr << "cannot load data file at " << str << ", please check if it exists" << endl;
-//            std::abort();
-//        }
-//
-//        // step1: 读入第一行，keyframe, mapPoint以及observation的个数
-//        FscanfOrDie(fptr, "%d", &nKFs);
-//        FscanfOrDie(fptr, "%d", &nMPs);
-//        FscanfOrDie(fptr, "%d", &nObservations);
-//
-//        // step2: 读取每个observation中，KF的id以及mapPoint的id以及在KF上观测到的这个mapPoint的(u,v)坐标
-//        KFids = new int[nObservations];
-//        MPids = new int[nObservations];
-//        observations = new double[nObservations*2];
-//        for (int i = 0; i < nObservations; ++i)
-//        {
-//            FscanfOrDie(fptr, "%d", KFids+i);
-//            FscanfOrDie(fptr, "%d", MPids+i);
-//            FscanfOrDie(fptr, "%lf", observations+2*i);
-//            FscanfOrDie(fptr, "%lf", observations+2*i+1);
-//        }
-//
-//        // step3: 读取每个keyframe的pose的初始值
-//        KFs = new double*[nKFs];
-//        for (int i = 0; i < nKFs; ++i)
-//        {
-//            KFs[i] = new double[9];
-//            for (int j = 0; j < 9; ++j)
-//            {
-//                FscanfOrDie(fptr, "%lf", KFs[i]+j);
-//            }
-//        }
-//
-//        // step4: 读取每个mapPoint的世界坐标的初始值
-//        Mps = new double*[nMPs];
-//        for (int i = 0; i < nMPs; ++i)
-//        {
-//            Mps[i] = new double[3];
-//            for (int j = 0; j < 3; ++j)
-//            {
-//                FscanfOrDie(fptr, "lf%", Mps[i]+j);
-//            }
-//        }
-//    }
-//
-////private:
-//public:
-//    int nKFs;
-//    int nMPs;
-//    int nObservations;
-//    int* KFids;
-//    int* MPids;
-//    double* observations;
-//    double** KFs;
-//    double** Mps;
-//};
 
 class BAdata
 {
@@ -237,6 +133,9 @@ int main()
                 new ReprojectError(BA.vObservations[i][0], BA.vObservations[i][1]));
         int KFid = BA.vKFid_MPid[i].first;
         int MPid = BA.vKFid_MPid[i].second;
+        // 第一个参数是代价函数，第二个参数是损失函数，后面的都是cost_function的待优化变量的指针，
+        // 并且待优化变量必须是double类型的，也就是不管是9维的R还是3维的t都必须转化为double输入进去，
+        // 它们的维度在构造cost_function的模板里面给定了，入参给指针，也就是地址起点，根据模板参数去确定取出几个double
         problem.AddResidualBlock(pCostFunction, nullptr, BA.pKFs + 9*KFid, BA.pMPs + 3*MPid);
     }
 
