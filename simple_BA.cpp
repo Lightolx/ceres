@@ -31,7 +31,7 @@ struct ReprojectError
         Xc /= -Xc[2];  // 转换到归一化平面
 
         // Step2: 去畸变，keyFrame的第7个参数是焦距fx = fy，并且假设cx = cy = 0，第8,9两个参数是去畸变系数
-        T r2 = Xc[0]*Xc[0] + Xc[1]*Xc[1];
+        T r2 = ceres::pow(Xc[0], 2) + ceres::pow(Xc[1], 2);
         Xc *= T(1) + pKeyFrame[7]*r2 + pKeyFrame[8]*r2*r2;
 
         // Step3: 归一化平面转换到成像平面上，小孔成像投影模型计算在成像平面上的(u,v)
@@ -40,7 +40,7 @@ struct ReprojectError
 
         // 最终计算残差，预测减去观测
         residual[0] = predict_u - u_;
-        residual[1] = predict_v - v_;
+        residual[1] = v_ - predict_v;
 
         return true;
     }
@@ -120,6 +120,29 @@ int main()
     // Step0: Read in data
     BAdata BA("BA_data.txt");
 
+    // Step0.5: Output the initial KeyFrames and MapPoints
+    std::ofstream fout("KFs.txt");
+    for (int i = 0; i < BA.nKFs; ++i)
+    {
+        for (int j = 0; j < 6; ++j)
+        {
+            fout << *(BA.pKFs + 9*i + j) << " ";
+        }
+        fout << endl;
+    }
+    fout.close();
+
+    fout.open("MPs.txt");
+    for (int i = 0; i < BA.nMPs; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            fout << *(BA.pMPs + 3*i + j) << " ";
+        }
+        fout << endl;
+    }
+    fout.close();
+
     // Step1: 添加各个残差块，residualBlock，每一个observation就能构成一个残差块
     // one term is added to the objective function per observation. 这句话可以这样理解：
     // 对于空间中的任意一个mapPoint，相机在某个地方拍它的一张照片，看它出现在照片中的什么位置就是一次observation，
@@ -143,10 +166,34 @@ int main()
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
     options.minimizer_progress_to_stdout = true;
+    options.max_num_iterations = 60;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
+
+    // Step2.5: Output the optimized KFs and MPs
+    fout.open("KF1s.txt");
+    for (int i = 0; i < BA.nKFs; ++i)
+    {
+        for (int j = 0; j < 6; ++j)
+        {
+            fout << *(BA.pKFs + 9*i + j) << " ";
+        }
+        fout << endl;
+    }
+    fout.close();
+
+    fout.open("MP1s.txt");
+    for (int i = 0; i < BA.nMPs; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            fout << *(BA.pMPs + 3*i + j) << " ";
+        }
+        fout << endl;
+    }
+    fout.close();
 
     return 0;
 }
