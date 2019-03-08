@@ -159,8 +159,10 @@ int main()
         // 第一个参数是代价函数，第二个参数是损失函数，后面的都是cost_function的待优化变量的指针，
         // 并且待优化变量必须是double类型的，也就是不管是9维的R还是3维的t都必须转化为double输入进去，
         // 它们的维度在构造cost_function的模板里面给定了，入参给指针，也就是地址起点，根据模板参数去确定取出几个double
-        problem.AddResidualBlock(pCostFunction, nullptr, BA.pKFs + 9*KFid, BA.pMPs + 3*MPid);
+        problem.AddResidualBlock(pCostFunction, new ceres::HuberLoss(5.991), BA.pKFs + 9*KFid, BA.pMPs + 3*MPid);
     }
+
+    // problem.RemoveResidualBlock(), ceres里不要使用RemoveResidualBlock()函数，这会引起AutoDiff出来的Jacobian出错
 
     // Step2: Solve it
     ceres::Solver::Options options;
@@ -171,6 +173,8 @@ int main()
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
+
+
 
     // Step2.5: Output the optimized KFs and MPs
     fout.open("KF1s.txt");
