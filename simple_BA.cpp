@@ -21,13 +21,13 @@ struct ReprojectError
         // Step0: 数据转换，把所有的数组转换为Eigen::Matrix
         // 在这里使用Eigen::Map<>方法，从data指针直接构造Eigen::Matrix，模版参数表示 const表示矩阵行列数固定，根据行列数从指针处读取固定数目的值构成Eigen::Matrix
         Eigen::Map<const Eigen::Matrix<T, 3, 1>> rotateVector(pKeyFrame);
-        Eigen::AngleAxis<T> rv(rotateVector.norm(), rotateVector/rotateVector.norm());
-        Eigen::Matrix<T, 3, 3> R(rv);
         Eigen::Map<const Eigen::Matrix<T, 3, 1>> t(pKeyFrame+3);
         Eigen::Map<const Eigen::Matrix<T, 3, 1>> Xw(pMapPoint);
 
         // Step1: 将这个mapPoint变换到相机坐标系下，先选转再平移，KeyFrame的前3维是旋转向量， 后3维是平移t
-        Eigen::Matrix<T, 3, 1> Xc = R*Xw + t;
+        Eigen::Matrix<T, 3, 1> temp_X;
+//        ceres::AngleAxisRotatePoint(rotateVector, Xw, temp_X);  // 通过旋转矩阵来变换Xw到Xc
+        Eigen::Matrix<T, 3, 1> Xc = temp_X + t;
         Xc /= -Xc[2];  // 转换到归一化平面
 
         // Step2: 去畸变，keyFrame的第7个参数是焦距fx = fy，并且假设cx = cy = 0，第8,9两个参数是去畸变系数

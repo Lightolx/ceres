@@ -15,7 +15,7 @@ using std::endl;
 
 struct StereoReprojectError
 {
-    explicit StereoReprojectError(double _u, double _v, double _ru, Eigen::Matrix3d _K): u(_u), v(_v), rv(_ru), K(_K)
+    explicit StereoReprojectError(double _u, double _v, double _ru, Eigen::Matrix3d _K): u(_u), v(_v), ru(_ru), K(_K), bf(0.5)
     {}
 
     template <typename T>  // 这个T是double或者Jet

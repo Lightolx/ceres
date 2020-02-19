@@ -32,20 +32,14 @@ struct costFunctor
 int main()
 {
     // step0: Read in data
-    std::ifstream fin("y.txt");
-    std::string ptline;
-    double y;
     std::vector<double> X;
     std::vector<double> Y;
 
-    double x = 0;
-    while (getline(fin, ptline))
-    {
-        std::stringstream ss(ptline);
-        ss >> y;
-        Y.push_back(y);
+    // y = exp(m*x + c)
+    // x=1:0.01:0.5, m = 3, c = 0.75
+    for (double x = 1.0; x < 5.0; x += 0.1) {
         X.push_back(x);
-        x += 0.01;
+        Y.push_back(std::exp(3*x + 0.75) + std::rand() % 2);
     }
     
     // Step1: construct the problem
@@ -60,7 +54,7 @@ int main()
         
         problem.AddResidualBlock(pCostFunction, nullptr, &m, &c);
     }
-    
+
     // Step2: configure options and solve the optimization problem
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_QR;
@@ -83,15 +77,15 @@ int main()
         errors2.push_back(pow(Y[i] - ceres::exp(mgt*X[i] + cgt), 2) * 0.5);
     }
 
-    std::ofstream fout("mc.txt");
-    fout << m << " " << c << endl;
-    fout.close();
+//    std::ofstream fout("mc.txt");
+//    fout << m << " " << c << endl;
+//    fout.close();
 
     double Error1 = std::accumulate(errors1.begin(), errors1.end(), 0.0);
     double Error2 = std::accumulate(errors2.begin(), errors2.end(), 0.0);
 
     cout << "最小二乘法的结果并不是 m = 3, c = 0.75，实际上，　" << endl;
     cout << "最小二乘的cost function Error1 = " << Error1;
-    cout << ", ground truth的cost function Error2 = " << Error2 << "， 比我们得到的解8.6051还要大\n";
+    cout << ", ground truth的cost function Error2 = " << Error2 << "， Error2比我们得到的Error1还要大\n";
 }
 
